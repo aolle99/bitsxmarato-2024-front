@@ -17,7 +17,7 @@ const INITIAL_MAP_CONFIGURATION: MapViewState = {
   latitude: 41.538670893605406,
   longitude: 1.8678398583041622,
   zoom: 15,
-  minZoom: 2,
+  minZoom: 14,
   maxZoom: 22,
 };
 
@@ -135,9 +135,6 @@ function getMultiLineCenter(multiLine: number[][][]): [number, number] {
 
 
 
-
-
-
 function MapVisualizer({
                          date,
                          mapStyle = MAP_STYLE,
@@ -155,13 +152,15 @@ function MapVisualizer({
   const reloadData = async (latitude: number, longitude: number, distance: number) => {
 
     setIsLoading(true);
-    const newAirQuality = await fetch(
-      `http://localhost:8000/airquality?lat=${latitude}&lon=${longitude}&distancia=${distance}&date=${date.toISOString()}`
-    ).then((response) => response.json());
 
-   const newRoads = await fetch(
-      `http://localhost:8000/roads?lat=${latitude}&lon=${longitude}&distancia=${distance}`
-    ).then((response) => response.json());
+    const [newAirQuality, newRoads] = await Promise.all([
+      fetch(
+        `http://localhost:8000/airquality?lat=${latitude}&lon=${longitude}&distancia=${distance}&date=${date.toISOString()}`
+      ).then((response) => response.json()),
+      fetch(
+        `http://localhost:8000/roads?lat=${latitude}&lon=${longitude}&distancia=${distance}`
+      ).then((response) => response.json()),
+    ]);
 
    // recorrer todos los puntos de roads y calcular el valor de la calidad del aire más cercano y guardarlo en un array
     const nearest_tmp = {}
