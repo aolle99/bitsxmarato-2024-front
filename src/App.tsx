@@ -6,16 +6,18 @@ import {scaleLinear, scaleThreshold} from 'd3-scale';
 
 import type {MapViewState} from '@deck.gl/core';
 import './App.css'
-import {Backdrop, Box, CircularProgress} from "@mui/material";
+import {Backdrop, Box, Button, CircularProgress} from "@mui/material";
 import {DatePicker, LocalizationProvider, TimePicker} from "@mui/x-date-pickers";
 import {AdapterDateFns} from "@mui/x-date-pickers/AdapterDateFnsV3";
 import {Color, HeatmapLayer} from "deck.gl";
 import {Feature, LineString, MultiLineString} from 'geojson';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import StopCircleIcon from '@mui/icons-material/StopCircle';
 
 
 const INITIAL_MAP_CONFIGURATION: MapViewState = {
-  latitude: 41.538670893605406,
-  longitude: 1.8678398583041622,
+  latitude: 41.38922055290922,
+  longitude: 2.113531600484349,
   zoom: 15,
   minZoom: 14,
   maxZoom: 22,
@@ -90,7 +92,7 @@ function calculateVisibleArea(latitude: number, zoom: number, viewportWidth: num
   const widthInMeters = metersPerPixel * viewportWidth;
   const heightInMeters = metersPerPixel * viewportHeight;
 
-  return parseInt((Math.min(widthInMeters, heightInMeters) * 0.5).toString());
+  return parseInt((Math.min(widthInMeters, heightInMeters) * 0.3).toString());
 }
 
 function getLineCenter(line: number[][]): [number, number] {
@@ -137,9 +139,11 @@ function getMultiLineCenter(multiLine: number[][][]): [number, number] {
 
 function MapVisualizer({
                          date,
+    playing,
                          mapStyle = MAP_STYLE,
                        }: {
   date: Date;
+  playing: boolean;
   mapStyle?: string;
 }) {
   const [airQuality, setAirQuality] = useState<DataPoint[] | undefined>(undefined);
@@ -163,6 +167,10 @@ function MapVisualizer({
     ]);
 
    // recorrer todos los puntos de roads y calcular el valor de la calidad del aire más cercano y guardarlo en un array
+    if (!newAirQuality || !newRoads) {
+      setIsLoading(false);
+      return;
+    }
     const nearest_tmp = {}
     newRoads.features.forEach((road: Road) => {
       let center: [number, number] = [0, 0];
@@ -262,7 +270,7 @@ function MapVisualizer({
     <>
       <Backdrop
         sx={(theme) => ({color: '#fff', zIndex: theme.zIndex.drawer + 1})}
-        open={isLoading}
+        open={isLoading && !playing}
       >
         <CircularProgress color="inherit"/>
       </Backdrop>
@@ -270,7 +278,7 @@ function MapVisualizer({
         layers={layers}
         pickingRadius={5}
         initialViewState={INITIAL_MAP_CONFIGURATION}
-        controller={true}
+        controller={!playing}
         onDragEnd={(event) => {
           if (!event.coordinate || !event.viewport || !event.viewport.zoom) return;
           const tmp_viewState = {
@@ -303,17 +311,30 @@ function MapVisualizer({
 
 function App() {
   const [date, setDate] = useState(new Date("2023-01-01T02:00"));
+  const [playing, isPlaying] = useState(false);
+
+    useEffect(() => {
+        if (playing) {
+        const interval = setInterval(() => {
+            const newDate = new Date(date);
+            newDate.setHours(newDate.getHours() + 1);
+            setDate(newDate);
+        }, 3000);
+        return () => clearInterval(interval);
+        }
+    }, [playing, date]);
 
   return (
     <Box display={"flex"} flexDirection={"column"} justifyContent={"center"} alignItems={"center"} width={"100%"}>
       <h2>Concentració de NO2 a les Carreteres Catalanes</h2>
-      <Box display={"flex"} alignItems={"center"} mb={2}>
+      <Box display={"flex"} alignItems={"center"} mb={2} gap={4}>
         <LocalizationProvider dateAdapter={AdapterDateFns}>
           {/* Selector de fecha */}
           <DatePicker
             label="Fecha a visualizar"
             format={"dd/MM/yyyy"}
             value={date}
+            disabled={playing}
             onChange={(newValue) => {
               if (newValue) {
                 // Actualiza solo la fecha, manteniendo la hora seleccionada
@@ -334,6 +355,7 @@ function App() {
             label="Hora a visualizar"
             value={date}
             minTime={new Date("2023-01-01T02:00")}
+            disabled={playing}
             onChange={(newValue) => {
               if (newValue) {
                 // Actualiza solo la hora
@@ -344,10 +366,16 @@ function App() {
             }}
           />
         </LocalizationProvider>
+        {playing ? (
+            <Button variant="contained" size="large" color="error" endIcon={<StopCircleIcon />} onClick={() => isPlaying(false)}>Parar</Button>
+          ) : (
+            <Button variant="contained" size="large" endIcon={<PlayArrowIcon />} onClick={() => isPlaying(true)}>Reproduir</Button>
+          )
+        }
       </Box>
 
       <Box style={{height: '80vh', width: '80vw', position: 'relative'}}>
-      <MapVisualizer date={date}/>
+      <MapVisualizer date={date} playing={playing}/>
     </Box>
 </Box>
 )
